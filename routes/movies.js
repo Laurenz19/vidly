@@ -1,41 +1,6 @@
-const mongoose = require('mongoose')
-const Joi = require('joi');
+const {Movie, validate} = require('../models/movies')
 const express = require('express');
 const router = express.Router();
-
-mongoose.connect('mongodb://0.0.0.0:27017/movieDb')
-        .then(()=>console.log('Connected to MongoDB ...'))
-        .catch(err=> console.error('Error: ', err))
-
-const movieSchema= mongoose.Schema({
-  title: {
-    type: String,
-    required: [true, 'a movie must have a title'],
-    minlength: [3, 'Title must at least 3 characters, we got {VALUE}'],
-    unique: true
-  },
-  genre:{
-    type: String,
-    enum:['Action', 'Horror', 'Romance', 'Comedie', 'Tutoriel'],
-    message: '{VALUE} is not supported'
-  },
-  tags:{
-    type: Array,
-    validate:{
-      validator: function(v){
-        return v && v.length > 0;
-      },
-      message: 'Must have at least one tags'
-    }
-  },
-  isPublished: {
-    type: Boolean, 
-    default: false
-  }
-}) 
-
-const Movie = mongoose.model('movie', movieSchema)
-
 
 router.get('/', async (req, res) => {
   const movies = await Movie.find()
@@ -44,7 +9,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
  
-  const { error } = validateMovie(req.body)
+  const { error } = validate(req.body)
   
   if(error) return res.status(400).send(error.details[0].message)
 
@@ -62,13 +27,19 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
 
-    return res.status(400).send(error.errors.message)
+        const errors = err.errors
+        let message = ''
+        for (const field in errors) {
+           message = errors[field].message
+        }
+        
+        res.status(400).send(message)
   }
 });
 
 router.put('/:id', async (req, res) => {
 
-  const { error } = validateMovie(req.body)
+  const { error } = validate(req.body)
   if(error) return res.status(400).send(error.details[0].message)
 
   const movie = await Movie.findByIdAndUpdate(req.params.id, {
@@ -102,17 +73,6 @@ router.get('/:id', async (req, res) => {
  
 });
 
-function validateMovie(movie) {
- 
-  const schema = Joi.object({
-    title: Joi.string().min(3).required(),
-    genre: Joi.string().required(),
-    tags: Joi.array().required(),
-    isPublished: Joi.boolean()
 
-  })
-
-  return schema.validate(movie);
-}
 
 module.exports = router;
